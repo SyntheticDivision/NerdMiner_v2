@@ -10,6 +10,7 @@
 #include "monitor.h"
 #include "OpenFontRender.h"
 #include <SPI.h>
+#include <WiFi.h>
 #include "rotation.h"
 #include "drivers/storage/nvMemory.h"
 #include "drivers/storage/storage.h"
@@ -170,6 +171,16 @@ static void drawTemp(const String &temp)
   tft.fillCircle(310, 14, 3, SYN_MAG);
 }
 
+static void drawIp(void)
+{
+  String ip = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : String("NO LINK");
+  tft.fillRect(38, 6, 176, 18, TFT_BLACK);
+  tft.setTextFont(2);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(SYN_CYAN, TFT_BLACK);
+  tft.drawString(ip, 126, 6);
+}
+
 static void drawStat(int x, int w, const char *k, const String &v)
 {
   tft.fillRect(x, 176, w, 62, TFT_BLACK);
@@ -233,6 +244,7 @@ static void drawChrome(const String &temp)
   tft.fillScreen(TFT_BLACK);
   drawMark(6, 4);
   drawTemp(temp);
+  drawIp();
   tft.drawFastHLine(8, 170, 304, SYN_YEL);
 }
 
@@ -258,6 +270,7 @@ void esp32_2432S028R_MinerScreen(unsigned long mElapsed)
     drawChrome(data.temp);
   else
     drawTemp(data.temp);
+  drawIp();
   hasChangedScreen = false;
 
   drawHero(data.currentHashRate);
@@ -281,6 +294,7 @@ void esp32_2432S028R_ClockScreen(unsigned long mElapsed)
     drawChrome(String(temperatureRead(), 0));
   else
     drawTemp(String(temperatureRead(), 0));
+  drawIp();
   hasChangedScreen = false;
 
   String clock = data.currentTime;
@@ -320,6 +334,7 @@ void esp32_2432S028R_GlobalHashScreen(unsigned long mElapsed)
     drawChrome(String(temperatureRead(), 0));
   else
     drawTemp(String(temperatureRead(), 0));
+  drawIp();
   hasChangedScreen = false;
 
   String price = data.btcPrice;
