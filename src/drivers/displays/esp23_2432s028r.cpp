@@ -173,7 +173,11 @@ static void drawTemp(const String &temp)
 
 static void drawIp(void)
 {
-  String ip = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : String("NO LINK");
+  String ip = "NO LINK";
+  if (WiFi.status() == WL_CONNECTED)
+    ip = WiFi.localIP().toString();
+  else if (WiFi.getMode() & WIFI_AP)
+    ip = WiFi.softAPIP().toString();
   tft.fillRect(38, 6, 176, 18, TFT_BLACK);
   tft.setTextFont(2);
   tft.setTextDatum(TC_DATUM);
@@ -336,12 +340,13 @@ void esp32_2432S028R_SetupScreen(void)
   tft.drawString("SYNMINER", 160, 70);
   tft.setTextFont(2);
   tft.setTextColor(SYN_YEL, TFT_BLACK);
-  tft.drawString("WiFi setup", 160, 110);
+  tft.drawString("WiFi setup", 160, 100);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString("SynMinerAP", 160, 136);
+  tft.drawString("Join SynMinerAP", 160, 128);
+  tft.setTextColor(SYN_YEL, TFT_BLACK);
+  tft.drawString("open  192.168.4.1", 160, 152);
   tft.setTextColor(SYN_MUTE, TFT_BLACK);
-  tft.drawString("password  MineYourCoins", 160, 158);
-  tft.drawString("then open  192.168.4.1", 160, 180);
+  tft.drawString("or synminer.local", 160, 176);
 }
 
 void esp32_2432S028R_AnimateCurrentScreen(unsigned long frame)

@@ -3,5 +3,6 @@
 
 void synGuiStart(void);
 void synGuiLoop(void);
+void synGuiOnStation(void);
 
 #endif

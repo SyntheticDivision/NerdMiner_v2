@@ -1,6 +1,8 @@
 #include "synGui.h"
 
 #include <WebServer.h>
+#include <DNSServer.h>
+#include <ESPmDNS.h>
 #include <WiFi.h>
 
 #include "monitor.h"
@@ -12,7 +14,10 @@ extern TSettings Settings;
 extern nvMemory nvMem;
 
 static WebServer synServer(80);
+static DNSServer synDns;
 static bool synStarted = false;
+static bool synDnsOn = false;
+static bool synMdnsOn = false;
 static String synPrice = "--";
 static String synHeight = "--";
 static unsigned long synMarketMs = 0;
@@ -36,6 +41,7 @@ static String jsonEscape(const String &in)
 static void handleStatus()
 {
   mining_data data = getMiningData(millis());
+  String ip = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
   String json = "{";
   json += "\"hash\":\"" + jsonEscape(data.currentHashRate) + "\",";
   json += "\"shares\":\"" + jsonEscape(data.completedShares) + "\",";
@@ -48,7 +54,8 @@ static void handleStatus()
   json += "\"pool\":\"" + jsonEscape(Settings.PoolAddress) + "\",";
   json += "\"port\":" + String(Settings.PoolPort) + ",";
   json += "\"worker\":\"" + jsonEscape(String(Settings.BtcWallet)) + "\",";
-  json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
+  json += "\"ip\":\"" + ip + "\",";
+  json += "\"host\":\"synminer.local\",";
   json += "\"version\":\"" + String(CURRENT_VERSION) + "\"";
   json += "}";
   synServer.send(200, "application/json", json);
@@ -78,6 +85,27 @@ static void handlePool()
   ESP.restart();
 }
 
+static void handleWifi()
+{
+  String ssid = synServer.arg("ssid");
+  ssid.trim();
+  String pass = synServer.arg("pass");
+  if (ssid.length() == 0 || ssid.length() > 32)
+  {
+    synServer.send(400, "text/plain", "Wi-Fi name is required.");
+    return;
+  }
+  synServer.send(200, "text/html", "<!doctype html><meta http-equiv=\"refresh\" content=\"8;url=/\">"
+                                   "<body style=\"background:#07080d;color:#22f0ff;font-family:monospace\">"
+                                   "<p>Joining Wi-Fi. Then open http://synminer.local</p></body>");
+  delay(300);
+  WiFi.persistent(true);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.begin(ssid.c_str(), pass.c_str());
+  delay(400);
+  ESP.restart();
+}
+
 static const char PAGE[] PROGMEM = R"HTML(<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -99,7 +127,8 @@ form{display:grid;gap:10px;margin-top:12px}
 input{width:100%;background:#0c1018;color:var(--ink);border:1px solid #2a3348;padding:10px;font:inherit}
 button{background:var(--cyan);color:#07080d;border:0;padding:12px;font:inherit;font-weight:700;cursor:pointer}
 a{color:var(--cyan)}
-.links{display:flex;gap:16px;margin-top:12px}
+.links{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap}
+@media(max-width:700px){.grid{grid-template-columns:1fr 1fr}}
 </style></head><body><main>
 <div class="row"><h1>SYNMINER</h1><div id="meta" class="k">--</div></div>
 <p class="hash" id="hash">--</p>
@@ -114,6 +143,14 @@ a{color:var(--cyan)}
 <div class="panel"><div class="k">BTC</div><div class="v" id="price">--</div></div>
 <div class="panel"><div class="k">CLOCK</div><div class="v" id="time">--</div></div>
 </div>
+<section class="panel" style="margin-top:16px">
+<div class="k">WI-FI</div>
+<form method="post" action="/api/wifi">
+<input name="ssid" placeholder="2.4 GHz network name" required>
+<input name="pass" type="password" placeholder="password">
+<button type="submit">Save Wi-Fi</button>
+</form>
+</section>
 <section class="panel" style="margin-top:16px">
 <div class="k">POOL</div>
 <form method="post" action="/api/pool">
@@ -134,7 +171,7 @@ async function tick(){
   const d=await r.json();
   hash.textContent=d.hash; best.textContent=d.best; shares.textContent=d.shares;
   height.textContent=d.height; temp.textContent=d.temp+'c'; price.textContent=d.price;
-  time.textContent=d.time; meta.textContent=d.ip+'  '+d.version+'  '+d.uptime;
+  time.textContent=d.time; meta.textContent='http://'+d.host+'   '+d.ip+'   '+d.version;
   if(document.activeElement.tagName!=='INPUT'){host.value=d.pool;port.value=d.port;worker.value=d.worker;}
 }
 tick(); setInterval(tick,2000);
@@ -147,23 +184,53 @@ static void handleRoot()
 
 void synGuiStart(void)
 {
-  if (synStarted || WiFi.status() != WL_CONNECTED)
+  if (synStarted)
     return;
   synServer.on("/", HTTP_GET, handleRoot);
   synServer.on("/api/status", HTTP_GET, handleStatus);
   synServer.on("/api/pool", HTTP_POST, handlePool);
+  synServer.on("/api/wifi", HTTP_POST, handleWifi);
+  synServer.on("/generate_204", HTTP_GET, handleRoot);
+  synServer.on("/gen_204", HTTP_GET, handleRoot);
+  synServer.on("/hotspot-detect.html", HTTP_GET, handleRoot);
+  synServer.on("/connecttest.txt", HTTP_GET, handleRoot);
+  synServer.on("/ncsi.txt", HTTP_GET, handleRoot);
+  synServer.on("/fwlink", HTTP_GET, handleRoot);
+  synServer.onNotFound(handleRoot);
   synServer.begin();
   synStarted = true;
-  Serial.print("SynMiner GUI http://");
-  Serial.println(WiFi.localIP());
+  Serial.println("SynMiner GUI on port 80");
+}
+
+void synGuiOnStation(void)
+{
+  WiFi.setSleep(WIFI_PS_NONE);
+  if (!synMdnsOn && MDNS.begin("synminer"))
+  {
+    MDNS.addService("http", "tcp", 80);
+    synMdnsOn = true;
+    Serial.println("SynMiner GUI http://synminer.local");
+  }
+  if (synDnsOn)
+  {
+    synDns.stop();
+    synDnsOn = false;
+  }
+  WiFi.softAPdisconnect(true);
 }
 
 void synGuiLoop(void)
 {
   if (!synStarted)
     return;
+  if ((WiFi.getMode() & WIFI_AP) && WiFi.status() != WL_CONNECTED)
+  {
+    if (!synDnsOn)
+      synDnsOn = synDns.start(53, "*", WiFi.softAPIP());
+    synDns.processNextRequest();
+  }
   synServer.handleClient();
-  if (synMarketMs == 0 || millis() - synMarketMs > 60000)
+  if (WiFi.status() == WL_CONNECTED && (synMarketMs == 0 || millis() - synMarketMs > 60000))
   {
     synMarketMs = millis();
     clock_data market = getClockData(millis());

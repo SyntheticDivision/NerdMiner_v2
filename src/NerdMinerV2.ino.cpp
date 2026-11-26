@@ -159,28 +159,18 @@ void setup()
   // Start mining tasks
   //BaseType_t res = xTaskCreate(runWorker, name, 35000, (void*)name, 1, NULL);
   TaskHandle_t minerTask1, minerTask2 = NULL;
-  #ifdef HARDWARE_SHA265
-    #if defined(CONFIG_IDF_TARGET_ESP32)
-    xTaskCreate(minerWorkerHw, "MinerHw-0", 3584, (void*)0, 3, &minerTask1); // Reduced for ESP32 classic
-    //xTaskCreate(minerWorkerSw, "MinerSw-0", 5000, (void*)0, 1, &minerTask1); // Reduced for ESP32 classic
-    #else
-    xTaskCreate(minerWorkerHw, "MinerHw-0", 4096, (void*)0, 3, &minerTask1);
-    #endif
+  #if defined(CONFIG_IDF_TARGET_ESP32)
+  // Classic ESP32 hardware SHA is the slow path (~150 kH/s). Software on both cores is faster.
+  xTaskCreatePinnedToCore(minerWorkerSw, "MinerSw-0", 6000, (void*)0, 2, &minerTask1, 0);
+  #elif defined(HARDWARE_SHA265)
+  xTaskCreate(minerWorkerHw, "MinerHw-0", 4096, (void*)0, 3, &minerTask1);
   #else
-    #if defined(CONFIG_IDF_TARGET_ESP32)
-    xTaskCreate(minerWorkerSw, "MinerSw-0", 5000, (void*)0, 1, &minerTask1); // Reduced for ESP32 classic
-    #else
-    xTaskCreate(minerWorkerSw, "MinerSw-0", 6000, (void*)0, 1, &minerTask1);
-    #endif
+  xTaskCreate(minerWorkerSw, "MinerSw-0", 6000, (void*)0, 1, &minerTask1);
   #endif
   esp_task_wdt_add(minerTask1);
 
 #if (SOC_CPU_CORES_NUM >= 2)
-  #if defined(CONFIG_IDF_TARGET_ESP32)
-  xTaskCreate(minerWorkerSw, "MinerSw-1", 5000, (void*)1, 1, &minerTask2); // Reduced for ESP32 classic
-  #else
-  xTaskCreate(minerWorkerSw, "MinerSw-1", 6000, (void*)1, 1, &minerTask2);
-  #endif
+  xTaskCreatePinnedToCore(minerWorkerSw, "MinerSw-1", 6000, (void*)1, 2, &minerTask2, 1);
   esp_task_wdt_add(minerTask2);
 #endif
 

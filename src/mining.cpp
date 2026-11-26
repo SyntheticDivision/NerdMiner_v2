@@ -405,7 +405,7 @@ void runStratumWorker(void *name) {
                                               nonce_pool += NONCE_PER_JOB_SW;
                                               #endif
                                               #endif
-                                              #ifdef HARDWARE_SHA265
+                                              #if defined(HARDWARE_SHA265) && !defined(CONFIG_IDF_TARGET_ESP32)
                                                 #if defined(CONFIG_IDF_TARGET_ESP32)
                                                   JobPush( s_job_request_list_hw, job_pool, nonce_pool, NONCE_PER_JOB_HW, currentPoolDifficulty, sha_buffer_swap, hw_midstate, bake);
                                                 #else
@@ -527,7 +527,7 @@ void runStratumWorker(void *name) {
       }
 #endif
 
-      #ifdef HARDWARE_SHA265
+      #if defined(HARDWARE_SHA265) && !defined(CONFIG_IDF_TARGET_ESP32)
       while (s_job_request_list_hw.size() < 4)
       {
         #if defined(CONFIG_IDF_TARGET_ESP32)

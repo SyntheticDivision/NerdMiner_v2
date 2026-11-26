@@ -160,7 +160,11 @@ void init_WifiManager()
     }
 #endif
     // Explicitly set WiFi mode
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.setHostname("synminer");
+    WiFi.setSleep(WIFI_PS_NONE);
+    WiFi.softAP(DEFAULT_SSID);
+    synGuiStart();
 
     if (!nvMem.loadConfig(&Settings))
     {
@@ -194,9 +198,9 @@ void init_WifiManager()
     wm.setAPCallback(configModeCallback);    
 
     //Advanced settings
-    wm.setConfigPortalBlocking(false); //Hacemos que el portal no bloquee el firmware
-    wm.setConnectTimeout(40); // how long to try to connect for before continuing
-    wm.setConfigPortalTimeout(180); // auto close configportal after n seconds
+    wm.setConfigPortalBlocking(false);
+    wm.setEnableConfigPortal(false);
+    wm.setConnectTimeout(20);
     // wm.setCaptivePortalEnable(false); // disable captive portal redirection
     // wm.setAPClientCheck(true); // avoid timeout if client connected to softap
     //wm.setTimeout(120);
@@ -262,70 +266,19 @@ void init_WifiManager()
   #endif
 
     Serial.println("AllDone: ");
-    if (forceConfig)    
-    {
-        // Run if we need a configuration
-        //No configuramos timeout al modulo
-        wm.setConfigPortalBlocking(true); //Hacemos que el portal SI bloquee el firmware
-        drawSetupScreen();
-        mMonitor.NerdStatus = NM_Connecting;
-        wm.startConfigPortal(apName, DEFAULT_WIFIPW);
+    if (forceConfig)
+        wm.setBreakAfterConfig(true);
 
-        if (shouldSaveConfig)
-        {
-            //Could be break forced after edditing, so save new config
-            Serial.println("failed to connect and hit timeout");
-            Settings.PoolAddress = pool_text_box.getValue();
-            Settings.PoolPort = atoi(port_text_box_num.getValue());
-            strncpy(Settings.PoolPassword, password_text_box.getValue(), sizeof(Settings.PoolPassword));
-            strncpy(Settings.BtcWallet, addr_text_box.getValue(), sizeof(Settings.BtcWallet));
-            Settings.Timezone = atoi(time_text_box_num.getValue());
-            //Serial.println(save_stats_to_nvs.getValue());
-            Settings.saveStats = (strncmp(save_stats_to_nvs.getValue(), "T", 1) == 0);
-            #if defined(ESP32_2432S028R) || defined(ESP32_2432S028_2USB)
-                Settings.invertColors = (strncmp(invertColors.getValue(), "T", 1) == 0);
-            #endif
-            #if defined(ESP32_2432S028R) || defined(ESP32_2432S028_2USB)
-                Settings.Brightness = atoi(brightness_text_box_num.getValue());
-            #endif
-            nvMem.saveConfig(&Settings);
-            delay(3*SECOND_MS);
-            //reset and try again, or maybe put it to deep sleep
-            ESP.restart();            
-        };
-    }
+    mMonitor.NerdStatus = NM_Connecting;
+    wm.autoConnect();
+    WiFi.setSleep(WIFI_PS_NONE);
+    if (WiFi.status() == WL_CONNECTED)
+        synGuiOnStation();
     else
     {
-        //Tratamos de conectar con la configuración inicial ya almacenada
-        mMonitor.NerdStatus = NM_Connecting;
-        // disable captive portal redirection
-        wm.setCaptivePortalEnable(true); 
-        wm.setConfigPortalBlocking(true);
-        wm.setEnableConfigPortal(true);
-        // if (!wm.autoConnect(Settings.WifiSSID.c_str(), Settings.WifiPW.c_str()))
-        if (!wm.autoConnect(apName, DEFAULT_WIFIPW))
-        {
-            Serial.println("Failed to connect to configured WIFI, and hit timeout");
-            if (shouldSaveConfig) {
-                // Save new config            
-                Settings.PoolAddress = pool_text_box.getValue();
-                Settings.PoolPort = atoi(port_text_box_num.getValue());
-                strncpy(Settings.PoolPassword, password_text_box.getValue(), sizeof(Settings.PoolPassword));
-                strncpy(Settings.BtcWallet, addr_text_box.getValue(), sizeof(Settings.BtcWallet));
-                Settings.Timezone = atoi(time_text_box_num.getValue());
-                // Serial.println(save_stats_to_nvs.getValue());
-                Settings.saveStats = (strncmp(save_stats_to_nvs.getValue(), "T", 1) == 0);
-                #if defined(ESP32_2432S028R) || defined(ESP32_2432S028_2USB)
-                Settings.invertColors = (strncmp(invertColors.getValue(), "T", 1) == 0);
-                #endif
-                #if defined(ESP32_2432S028R) || defined(ESP32_2432S028_2USB)
-                Settings.Brightness = atoi(brightness_text_box_num.getValue());
-                #endif
-                nvMem.saveConfig(&Settings);
-                vTaskDelay(2000 / portTICK_PERIOD_MS);      
-            }        
-            ESP.restart();                            
-        } 
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP(DEFAULT_SSID);
+        drawSetupScreen();
     }
     
     //Conectado a la red Wifi
@@ -335,7 +288,7 @@ void init_WifiManager()
         Serial.println("WiFi connected");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
-        synGuiStart();
+        synGuiOnStation();
 
 
         // Lets deal with the user config values
@@ -434,6 +387,8 @@ void wifiManagerProcess() {
 
     wm.process();
     if (WiFi.status() == WL_CONNECTED)
+      synGuiOnStation();
+    else
       synGuiStart();
     synGuiLoop();
 
