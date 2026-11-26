@@ -18,7 +18,11 @@
 #define DEFAULT_POOLPORT	3338
 #define DEFAULT_TIMEZONE	2
 #define DEFAULT_SAVESTATS	false
+#if defined(ESP32_2432S028_2USB)
+#define DEFAULT_INVERTCOLORS	true
+#else
 #define DEFAULT_INVERTCOLORS	false
+#endif
 #define DEFAULT_BRIGHTNESS	250
 
 // JSON config files

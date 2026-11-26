@@ -36,6 +36,7 @@ bool nvMemory::saveConfig(TSettings* Settings)
         json[JSON_SPIFFS_KEY_TIMEZONE] = Settings->Timezone;
         json[JSON_SPIFFS_KEY_STATS2NV] = Settings->saveStats;
         json[JSON_SPIFFS_KEY_INVCOLOR] = Settings->invertColors;
+        json["invertSet"] = true;
         json[JSON_SPIFFS_KEY_BRIGHTNESS] = Settings->Brightness;
 
         // Open config file
@@ -99,11 +100,10 @@ bool nvMemory::loadConfig(TSettings* Settings)
                         Settings->Timezone = json[JSON_SPIFFS_KEY_TIMEZONE].as<int>();
                     if (json.containsKey(JSON_SPIFFS_KEY_STATS2NV))
                         Settings->saveStats = json[JSON_SPIFFS_KEY_STATS2NV].as<bool>();
-                    if (json.containsKey(JSON_SPIFFS_KEY_INVCOLOR)) {
+                    if (json.containsKey("invertSet") && json.containsKey(JSON_SPIFFS_KEY_INVCOLOR))
                         Settings->invertColors = json[JSON_SPIFFS_KEY_INVCOLOR].as<bool>();
-                    } else {
-                        Settings->invertColors = false;
-                    }
+                    else
+                        Settings->invertColors = DEFAULT_INVERTCOLORS;
                     if (json.containsKey(JSON_SPIFFS_KEY_BRIGHTNESS)) {
                         Settings->Brightness = json[JSON_SPIFFS_KEY_BRIGHTNESS].as<int>();
                     } else {

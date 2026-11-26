@@ -52,12 +52,11 @@ void esp32_2432S028R_Init(void)
 { 
   // getChipInfo();  
   tft.init();
+#ifdef ESP32_2432S028_2USB
+  invertColors = true;
+#endif
   if (nvMem.loadConfig(&Settings))
-    {      
-     // Serial.print("Invert Colors: ");
-     // Serial.println(Settings.invertColors);  
-      invertColors = Settings.invertColors;           
-    }  
+    invertColors = Settings.invertColors;
   tft.invertDisplay(invertColors);
   tft.setRotation(1);    
   tft.setSwapBytes(true); // Swap the colour byte order when rendering
