@@ -1,3 +1,30 @@
+# SynMiner
+
+SynMiner is a fork of [NerdMiner v2](https://github.com/BitMaker-hub/NerdMiner_v2) for the Cheap Yellow Display **ESP32-2432S028, 2.8 inch, two USB ports** (ESP32-WROOM-32, not S3). Firmware **0.1.7**.
+
+The miner speaks Stratum, solo-mines Bitcoin, and keeps a small dashboard on the device so pool and Wi-Fi can be changed without reflashing.
+
+## What changed from NerdMiner
+
+- **Board.** Build env `ESP32_2432S028_2USB`. Landscape rotation. The 2-USB panel is color-inverted by default, because that panel draws the stock palette backwards.
+- **Screen.** SynAxe-style console: logo in the corner, large centered figures on Mine, Market, and Clock, unit under the number, board temperature, and the IP address on every screen. Digits use the panel's built-in 75 px font so they fit a 320×240 display.
+- **Pool defaults.** `stratum.directpool.io` port `3338`, worker `bc1qkcpmuwuxnqgwhfgrc9t3lq447m0dj99tlj6qje.synminerdev`. Pool host, port, and worker are editable and stored in `/synminer.json` (a new file, so an old NerdMiner config is not reused).
+- **Dashboard, always on.** Same idea as a NerdQaxe: join the open Wi-Fi `SynMinerAP` and open `http://192.168.4.1` (the page should pop up). After the board joins your 2.4 GHz network, use `http://synminer.local` or the IP on the screen. Use `http`, not `https`. The page shows hashrate, shares, best difficulty, height, board temperature, price, and clock, and it can save Wi-Fi and pool settings. Dev links: [YouTube SyntheticDee](https://www.youtube.com/@SyntheticDee) and [X Syn_Division](https://x.com/Syn_Division).
+- **Shares.** `mining.submit` nonces are padded to 8 hex digits. NerdMiner sometimes dropped the leading zeros, so about 1 in 16 shares never got checked by the pool.
+- **Hashrate.** One core uses the ESP32 hardware SHA engine and the other uses the software hasher. On this WROOM-32 that lands around **350 kH/s**. A test that put both cores on software fell to about 46 kH/s and was reverted. **990 kH/s is not possible on this chip.** Each core tops out near 150–200 kH/s of real SHA-256d. A number in that range on the screen means it is actually hashing.
+
+## Flash 0.1.7
+
+The image is a full flash (bootloader, partition table, `boot_app0`, and the app) at offset `0x0`, DIO, 40 MHz, 4 MB. The splash screen should read `0.1.7`.
+
+```bat
+esptool.py --chip esp32 -p COM12 -b 921600 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB 0x0 ESP32_2432S028_2USB.bin
+```
+
+ESP-IDF 5.5's esptool can write this prebuilt image. Rebuilding the project still needs PlatformIO with Arduino-ESP32 2.0.14 (`pio run -e ESP32_2432S028_2USB`).
+
+---
+
 # NerdSoloMiner
 
 **The NerdSoloMiner v2**
