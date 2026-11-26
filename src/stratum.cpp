@@ -208,6 +208,11 @@ bool parse_mining_notify(String line, mining_job& mJob)
 bool tx_mining_submit(WiFiClient& client, mining_subscribe mWorker, mining_job mJob, unsigned long nonce, unsigned long &submit_id)
 {
     char payload[BUFFER] = {0};
+    char nonceHex[9];
+
+    // ckpool rejects a nonce shorter than 8 hex chars (SE_NO_NONCE).
+    // String(nonce, HEX) drops leading zeros, so about 1 in 16 shares never get evaluated.
+    snprintf(nonceHex, sizeof(nonceHex), "%08x", (unsigned int)nonce);
 
     // Submit
     id = getNextId(id);
@@ -218,7 +223,7 @@ bool tx_mining_submit(WiFiClient& client, mining_subscribe mWorker, mining_job m
         mJob.job_id.c_str(),
         mWorker.extranonce2.c_str(),
         mJob.ntime.c_str(),
-        String(nonce, HEX).c_str()
+        nonceHex
         );
     Serial.print("  Sending  : "); Serial.print(payload);
     client.print(payload);
