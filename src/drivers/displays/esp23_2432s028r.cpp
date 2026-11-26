@@ -4,8 +4,6 @@
 
 #include <TFT_eSPI.h>
 #include <TFT_eTouch.h>
-#include "media/images_320_170.h"
-#include "media/images_bottom_320_70.h"
 #include "media/myFonts.h"
 #include "media/Free_Fonts.h"
 #include "version.h"
@@ -149,378 +147,202 @@ bool createBackgroundSprite(int16_t wdt, int16_t hgt){  // Set the background an
   return background.created();
 }
 
-extern unsigned long mPoolUpdate;
+static const uint16_t SYN_CYAN = 0x279F;
+static const uint16_t SYN_YEL = 0xFF09;
+static const uint16_t SYN_MAG = 0xF974;
+static const uint16_t SYN_MUTE = 0x7BEF;
 
-void printPoolData(){
-  if ((hasChangedScreen) || (mPoolUpdate == 0) || (millis() - mPoolUpdate > UPDATE_POOL_min * 60 * 1000)){     
-      if (Settings.PoolAddress != "tn.vkbit.com") { 
-          pData = getPoolData();             
-          background.createSprite(320,50); //Background Sprite
-          if (!background.created()) {    
-            Serial.println("###### POOL SPRITE ERROR ######");
-          // Serial.printf("Pool data W:%d H:%s D:%s\n", pData.workersCount, pData.workersHash, pData.bestDifficulty);
-            printheap();        
-          }       
-          background.setSwapBytes(true);
-          if (bottomScreenBlue) {
-            background.pushImage(0, -20, 320, 70, bottonPoolScreen);
-            tft.pushImage(0,170,320,20,bottonPoolScreen);      
-          } else {
-            background.pushImage(0, -20, 320, 70, bottonPoolScreen_g);
-            tft.pushImage(0,170,320,20,bottonPoolScreen_g);
-          }
-                
-          render.setDrawer(background); // Link drawing object to background instance (so font will be rendered on background)
-          render.setLineSpaceRatio(1);
-          
-          render.setFontSize(24);
-          render.cdrawString(String(pData.workersCount).c_str(), 157, 16, TFT_BLACK);
-          render.setFontSize(18);
-          render.setAlignment(Align::BottomRight);
-          render.cdrawString(pData.workersHash.c_str(), 265, 14, TFT_BLACK);
-          render.setAlignment(Align::BottomLeft);
-          render.cdrawString(pData.bestDifficulty.c_str(), 54, 14, TFT_BLACK);
-          background.pushSprite(0,190);      
-          background.deleteSprite();
-      } else {
-        pData.bestDifficulty = "TESTNET";
-        pData.workersHash = "TESTNET";
-        pData.workersCount = 1;
-        tft.fillRect(0,170,320,70, TFT_DARKGREEN);        
-        background.createSprite(320,40); //Background Sprite
-        background.fillSprite(TFT_DARKGREEN);
-          if (!background.created()) {    
-            Serial.println("###### POOL SPRITE ERROR ######");
-          // Serial.printf("Pool data W:%d H:%s D:%s\n", pData.workersCount, pData.workersHash, pData.bestDifficulty);
-            printheap();        
-          }
-        background.setFreeFont(FF24);
-        background.setTextDatum(TL_DATUM);
-        background.setTextSize(1);
-        background.setTextColor(TFT_WHITE, TFT_DARKGREEN);        
-        background.drawString("TESTNET", 50, 0, GFXFF);
-        background.pushSprite(0,185);  
-        mPoolUpdate = millis();
-        Serial.println("Testnet");
-        background.deleteSprite();
-      }
-  }
+static void drawMark(int x, int y)
+{
+  tft.fillRoundRect(x, y, 28, 28, 5, TFT_BLACK);
+  tft.drawRoundRect(x, y, 28, 28, 5, SYN_YEL);
+  tft.fillTriangle(x + 15, y + 5, x + 23, y + 7, x + 16, y + 13, SYN_MAG);
+  tft.fillRect(x + 7, y + 8, 6, 4, SYN_CYAN);
+  tft.fillRect(x + 12, y + 10, 3, 12, SYN_CYAN);
 }
 
+static void drawTemp(const String &temp)
+{
+  tft.fillRect(220, 2, 98, 24, TFT_BLACK);
+  tft.setTextFont(2);
+  tft.setTextDatum(TR_DATUM);
+  tft.setTextColor(SYN_YEL, TFT_BLACK);
+  tft.drawString(temp + "c", 300, 6);
+  tft.fillCircle(310, 14, 3, SYN_MAG);
+}
 
+static void drawStat(int x, int w, const char *k, const String &v)
+{
+  tft.fillRect(x, 188, w, 50, TFT_BLACK);
+  tft.setTextFont(2);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(SYN_MUTE, TFT_BLACK);
+  tft.drawString(k, x + w / 2, 192);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  String shown = v;
+  if (shown.length() > 10) shown = shown.substring(0, 10);
+  tft.drawString(shown, x + w / 2, 210);
+}
+
+static void drawHero(const String &value)
+{
+  const int w = 300;
+  const int h = 86;
+  if (!createBackgroundSprite(w, h))
+  {
+    tft.setTextFont(4);
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextColor(SYN_CYAN, TFT_BLACK);
+    tft.drawString(value, 160, 80);
+    return;
+  }
+  background.fillSprite(TFT_BLACK);
+  render.setFontSize(56);
+  render.setAlignment(Align::MiddleCenter);
+  render.cdrawString(value.c_str(), w / 2, h / 2, SYN_CYAN);
+  background.pushSprite(10, 48);
+  background.deleteSprite();
+}
+
+static void drawUnit(const char *unit)
+{
+  tft.fillRect(0, 138, 320, 36, TFT_BLACK);
+  tft.setFreeFont(FSSB18);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(SYN_YEL, TFT_BLACK);
+  tft.drawString(unit, 160, 140);
+}
+
+static void drawChrome(const String &temp)
+{
+  tft.fillScreen(TFT_BLACK);
+  drawMark(8, 6);
+  drawTemp(temp);
+  tft.drawFastHLine(8, 182, 304, SYN_YEL);
+}
+
+static const char *poolState(void)
+{
+  switch (mMonitor.NerdStatus)
+  {
+  case NM_hashing:
+    return "OK";
+  case NM_Connecting:
+    return "LINK";
+  case NM_waitingConfig:
+    return "CFG";
+  default:
+    return "--";
+  }
+}
 
 void esp32_2432S028R_MinerScreen(unsigned long mElapsed)
 {
   mining_data data = getMiningData(mElapsed);
+  if (hasChangedScreen)
+    drawChrome(data.temp);
+  else
+    drawTemp(data.temp);
+  hasChangedScreen = false;
 
-  printPoolData();
+  drawHero(data.currentHashRate);
+  drawUnit("kH/s");
 
-  if (hasChangedScreen) tft.pushImage(0, 0, initWidth, initHeight, MinerScreen);
-    
-  hasChangedScreen = false; 
- 
-  int wdtOffset = 190;
-  // Recreate sprite to the right side of the screen
-  createBackgroundSprite(WIDTH-5, HEIGHT-7);
-  //Print background screen    
-  background.pushImage(-190, 0, MinerWidth, MinerHeight, MinerScreen);
-  
-  // Total hashes
-  render.setFontSize(18);
-  render.rdrawString(data.totalMHashes.c_str(), 268-wdtOffset, 138, TFT_BLACK);
+  const int col = 80;
+  drawStat(0, col, "BEST", data.bestDiff);
+  drawStat(col, col, "SHARES", data.completedShares);
+  drawStat(col * 2, col, "HEIGHT", getClockData(mElapsed).blockHeight);
+  drawStat(col * 3, col, "POOL", poolState());
 
-  // Block templates
-  render.setFontSize(18);
-  render.setAlignment(Align::TopLeft);
-  render.drawString(data.templates.c_str(), 189-wdtOffset, 20, 0xDEDB);
-  // Best diff
-  render.drawString(data.bestDiff.c_str(), 189-wdtOffset, 48, 0xDEDB);
-  // 32Bit shares
-  render.setFontSize(18);
-  render.drawString(data.completedShares.c_str(), 189-wdtOffset, 76, 0xDEDB);
-  // Hores
-  render.setFontSize(14);
-  render.rdrawString(data.timeMining.c_str(), 315-wdtOffset, 104, 0xDEDB);
-
-  // Valid Blocks
-  render.setFontSize(24);
-  render.setAlignment(Align::TopCenter);
-  render.drawString(data.valids.c_str(), 290-wdtOffset, 56, 0xDEDB);
-
-  // Print Temp
-  render.setFontSize(10);
-  render.rdrawString(data.temp.c_str(), 239-wdtOffset, 1, TFT_BLACK);
-
-  render.setFontSize(4);
-  render.rdrawString(String(0).c_str(), 244-wdtOffset, 3, TFT_BLACK);
-
-  // Print Hour
-  render.setFontSize(10);
-  render.rdrawString(data.currentTime.c_str(), 286-wdtOffset, 1, TFT_BLACK);
-
-  // Push prepared background to screen
-  background.pushSprite(190, 0);
-
-  // Delete sprite to free the memory heap
-  background.deleteSprite();   
-  // printheap();
-
-   //Serial.println("=========== Mining Display ==============") ;
-  // Create background sprite to print data at once
-  createBackgroundSprite(WIDTH-7, HEIGHT-100); // initHeight); //Background Sprite
-  //Print background screen    
-  background.pushImage(0, -90, MinerWidth, MinerHeight, MinerScreen);
-
-  // Hashrate 
-  render.setFontSize(35);
-  render.setCursor(19, 118);
-  render.setFontColor(TFT_BLACK);
-  render.rdrawString(data.currentHashRate.c_str(), 118, 114-90, TFT_BLACK);
-  
-  // Push prepared background to screen
-  background.pushSprite(0, 90);
-  
-  // Delete sprite to free the memory heap
-  background.deleteSprite();  
-
-  Serial.printf(">>> Completed %s share(s), %s Khashes, avg. hashrate %s KH/s\n",
-                data.completedShares.c_str(), data.totalKHashes.c_str(), data.currentHashRate.c_str()); 
-   
-  #ifdef DEBUG_MEMORY
-    // Print heap
-    printheap();
-  #endif
+  Serial.printf(">>> SynMiner %s kH/s  shares %s  temp %s\n",
+                data.currentHashRate.c_str(), data.completedShares.c_str(), data.temp.c_str());
 }
 
 void esp32_2432S028R_ClockScreen(unsigned long mElapsed)
 {
-
-  if (hasChangedScreen) tft.pushImage(0, 0, minerClockWidth, minerClockHeight, minerClockScreen);
-  
-  printPoolData();
-
+  clock_data data = getClockData(mElapsed);
+  clock_data_t tick = getClockData_t(mElapsed);
+  if (hasChangedScreen)
+    drawChrome(String(temperatureRead(), 0));
+  else
+    drawTemp(String(temperatureRead(), 0));
   hasChangedScreen = false;
 
-  clock_data data = getClockData(mElapsed);
+  String clock = data.currentTime;
+  clock.replace(":", " ");
+  drawHero(clock);
+  if (createBackgroundSprite(16, 40))
+  {
+    background.fillSprite(TFT_BLACK);
+    background.fillCircle(8, 12, 3, SYN_CYAN);
+    background.fillCircle(8, 28, 3, SYN_CYAN);
+    background.pushSprite(152, 68);
+    background.deleteSprite();
+  }
+  drawUnit(data.currentDate.c_str());
 
- // Create background sprite to print data at once
-  createBackgroundSprite(270,36);
-
-  // Print background screen
-  background.pushImage(0, -130, minerClockWidth, minerClockHeight, minerClockScreen);
-  // Hashrate
-  render.setFontSize(25);
-  render.setFontColor(TFT_BLACK);
-  render.rdrawString(data.currentHashRate.c_str(), 95, 0, TFT_BLACK);
-
-  // Print BlockHeight
-  render.setFontSize(18);
-  render.rdrawString(data.blockHeight.c_str(), 254, 9, TFT_BLACK);
-
-  // Push prepared background to screen
-  background.pushSprite(0, 130);
-  // Delete sprite to free the memory heap
-  background.deleteSprite(); 
-
-  createBackgroundSprite(169,105);
-  // Print background screen
-  background.pushImage(-130, -3, minerClockWidth, minerClockHeight, minerClockScreen);
-  
-  // Print BTC Price
-  background.setFreeFont(FSSB9);
-  background.setTextSize(1);
-  background.setTextDatum(TL_DATUM);
-  background.setTextColor(TFT_BLACK);
-  background.drawString(data.btcPrice.c_str(), 202-130, 0, GFXFF);
- 
-  // Print Hour
-  background.setFreeFont(FF23);
-  background.setTextSize(2);
-  background.setTextColor(0xDEDB, TFT_BLACK);
-  background.drawString(data.currentTime.c_str(), 0, 50, GFXFF);
- 
-  // Push prepared background to screen
-  background.pushSprite(130, 3);
-
-  // Delete sprite to free the memory heap
-  background.deleteSprite();   
-
-  Serial.printf(">>> Completed %s share(s), %s Khashes, avg. hashrate %s KH/s\n",
-                data.completedShares.c_str(), data.totalKHashes.c_str(), data.currentHashRate.c_str());
-
-  #ifdef DEBUG_MEMORY
-  // Print heap
-  printheap();
-  #endif
+  char sec[8];
+  char zone[12];
+  snprintf(sec, sizeof(sec), "%02lu", tick.currentSeconds);
+  snprintf(zone, sizeof(zone), "UTC%+d", Settings.Timezone);
+  const int col = 106;
+  drawStat(0, col, "SEC", sec);
+  drawStat(col, col, "ZONE", zone);
+  drawStat(col * 2, col, "RATE", data.currentHashRate);
 }
 
 void esp32_2432S028R_GlobalHashScreen(unsigned long mElapsed)
 {
-  if (hasChangedScreen) tft.pushImage(0, 0, globalHashWidth, globalHashHeight, globalHashScreen);
-  
-  printPoolData();
-  
-  hasChangedScreen = false;
-  
   coin_data data = getCoinData(mElapsed);
-
-  // Create background sprite to print data at once
-  createBackgroundSprite(169,105);
-  // Print background screen
-  background.pushImage(-160, -3, minerClockWidth, minerClockHeight, globalHashScreen);
-  
-  // Print BTC Price
-  background.setFreeFont(FSSB9);
-  background.setTextSize(1);
-  background.setTextDatum(TL_DATUM);
-  background.setTextColor(TFT_BLACK);
-  background.drawString(data.btcPrice.c_str(), 198-160, 0, GFXFF);
-  // Print Hour
-  background.setFreeFont(FSSB9);
-  background.setTextSize(1);
-  background.setTextDatum(TL_DATUM);
-  background.setTextColor(TFT_BLACK);
-  background.drawString(data.currentTime.c_str(), 268-160, 0, GFXFF);
-
-  // Print Last Pool Block
-  background.setFreeFont(FSS9);
-  background.setTextDatum(TR_DATUM);
-  background.setTextColor(0x9C92);
-  background.drawString(data.halfHourFee.c_str(), 302-160, 49, GFXFF);
-
-  // Print Difficulty
-  background.setFreeFont(FSS9);
-  background.setTextDatum(TR_DATUM);
-  background.setTextColor(0x9C92);
-  background.drawString(data.netwrokDifficulty.c_str(), 302-160, 85, GFXFF);
-  // Push prepared background to screen
-  background.pushSprite(160, 3);
-  // Delete sprite to free the memory heap
-  background.deleteSprite();   
-
- // Create background sprite to print data at once
-  createBackgroundSprite(280,30);
-  // Print background screen
-  background.pushImage(0, -139, minerClockWidth, minerClockHeight, globalHashScreen);
-  //background.fillSprite(TFT_CYAN);
-  // Print Global Hashrate
-  render.setFontSize(17);
-  render.rdrawString(data.globalHashRate.c_str(), 274, 145-139, TFT_BLACK);
-
-  // Draw percentage rectangle
-  int x2 = 2 + (138 * data.progressPercent / 100);
-  background.fillRect(2, 149-139, x2, 168, 0xDEDB);
-
-  // Print Remaining BLocks
-  background.setTextFont(FONT2);
-  background.setTextSize(1); 
-  background.setTextDatum(MC_DATUM);
-  background.setTextColor(TFT_BLACK);
-  background.drawString(data.remainingBlocks.c_str(), 72, 159-139, FONT2);
-
-  // Push prepared background to screen
-  background.pushSprite(0, 139);
-  // Delete sprite to free the memory heap
-  background.deleteSprite();   
-
- // Create background sprite to print data at once
-  createBackgroundSprite(140,40);
-  // Print background screen
-  background.pushImage(-5, -100, minerClockWidth, minerClockHeight, globalHashScreen);
-  //background.fillSprite(TFT_CYAN);
-  // Print BlockHeight
-  render.setFontSize(28);
-  render.rdrawString(data.blockHeight.c_str(), 140-5, 104-100, 0xDEDB);
-
-  // Push prepared background to screen
-  background.pushSprite(5, 100);
-  // Delete sprite to free the memory heap
-  background.deleteSprite();   
-
-  Serial.printf(">>> Completed %s share(s), %s Khashes, avg. hashrate %s KH/s\n",
-                data.completedShares.c_str(), data.totalKHashes.c_str(), data.currentHashRate.c_str());
-
-  #ifdef DEBUG_MEMORY
-  // Print heap
-  printheap();
-  #endif
-}
-void esp32_2432S028R_BTCprice(unsigned long mElapsed)
-{
-  
-  if (hasChangedScreen) tft.pushImage(0, 0, priceScreenWidth, priceScreenHeight, priceScreen);
-  printPoolData();
+  if (hasChangedScreen)
+    drawChrome(String(temperatureRead(), 0));
+  else
+    drawTemp(String(temperatureRead(), 0));
   hasChangedScreen = false;
 
-  clock_data data = getClockData(mElapsed);
+  String price = data.btcPrice;
+  price.replace("$", "");
+  price.replace(",", "");
+  drawHero(price);
+  drawUnit("BTC");
 
- // Create background sprite to print data at once
-  createBackgroundSprite(270,36);
-
-  // Print background screen
-  background.pushImage(0, -130, priceScreenWidth, priceScreenHeight, priceScreen);
-  // Hashrate
-  render.setFontSize(25);
-  render.setFontColor(TFT_BLACK);
-  render.rdrawString(data.currentHashRate.c_str(), 95, 0, TFT_BLACK);
-
-  // Print BlockHeight
-  render.setFontSize(18);
-  render.rdrawString(data.blockHeight.c_str(), 254, 9, TFT_WHITE);
-
-  // Push prepared background to screen
-  background.pushSprite(0, 130);
-  // Delete sprite to free the memory heap
-  background.deleteSprite(); 
-
-  createBackgroundSprite(180,105);
-  // Print background screen
-  background.pushImage(-130, -3, priceScreenWidth, priceScreenHeight, priceScreen);
-  
-  // Print Hour
-  background.setFreeFont(FSSB9);
-  background.setTextSize(1);
-  background.setTextDatum(TL_DATUM);
-  background.setTextColor(TFT_BLACK);
-  background.drawString(data.currentTime.c_str(), 202-130, 0, GFXFF);
- 
-  // Print BTC Price
-  background.setFreeFont(FF24);
-  background.setTextDatum(TL_DATUM);
-  background.setTextSize(1);
-  background.setTextColor(0xDEDB, TFT_BLACK);
-  background.drawString(data.btcPrice.c_str(), 0, 50, GFXFF);
- 
-  // Push prepared background to screen
-  background.pushSprite(130, 3);
-
-  // Delete sprite to free the memory heap
-  background.deleteSprite();   
-
-  Serial.printf(">>> Completed %s share(s), %s Khashes, avg. hashrate %s KH/s\n",
-                data.completedShares.c_str(), data.totalKHashes.c_str(), data.currentHashRate.c_str());
-
-  #ifdef DEBUG_MEMORY
-  // Print heap
-  printheap();
-  #endif
+  const int col = 106;
+  drawStat(0, col, "FEES", data.halfHourFee);
+  drawStat(col, col, "DIFF", data.netwrokDifficulty);
+  drawStat(col * 2, col, "LEFT", data.remainingBlocks);
 }
 
 void esp32_2432S028R_LoadingScreen(void)
 {
   tft.fillScreen(TFT_BLACK);
-  tft.pushImage(0, 33, initWidth, initHeight, initScreen);
-  tft.setTextColor(TFT_BLACK);
-  tft.drawString(CURRENT_VERSION, 24, 147, FONT2);
-  // delay(2000);
-  // tft.fillScreen(TFT_BLACK);
-  // tft.pushImage(0, 0, initWidth, initHeight, MinerScreen);
+  drawMark(146, 70);
+  tft.setTextFont(4);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(SYN_CYAN, TFT_BLACK);
+  tft.drawString("SYNMINER", 160, 112);
+  tft.setTextFont(2);
+  tft.setTextColor(SYN_YEL, TFT_BLACK);
+  tft.drawString("SOLO", 160, 148);
+  tft.setTextColor(SYN_MUTE, TFT_BLACK);
+  tft.drawString(CURRENT_VERSION, 160, 172);
 }
 
 void esp32_2432S028R_SetupScreen(void)
 {
   tft.fillScreen(TFT_BLACK);
-  tft.pushImage(0, 33, setupModeWidth, setupModeHeight, setupModeScreen);
+  drawMark(8, 8);
+  tft.setTextFont(4);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(SYN_CYAN, TFT_BLACK);
+  tft.drawString("SYNMINER", 160, 70);
+  tft.setTextFont(2);
+  tft.setTextColor(SYN_YEL, TFT_BLACK);
+  tft.drawString("WiFi setup", 160, 110);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.drawString("SynMinerAP", 160, 136);
+  tft.setTextColor(SYN_MUTE, TFT_BLACK);
+  tft.drawString("password  MineYourCoins", 160, 158);
+  tft.drawString("then open  192.168.4.1", 160, 180);
 }
 
 void esp32_2432S028R_AnimateCurrentScreen(unsigned long frame)
@@ -599,7 +421,7 @@ void esp32_2432S028R_DoLedStuff(unsigned long frame)
 
 }
 
-CyclicScreenFunction esp32_2432S028RCyclicScreens[] = {esp32_2432S028R_MinerScreen, esp32_2432S028R_ClockScreen, esp32_2432S028R_GlobalHashScreen, esp32_2432S028R_BTCprice};
+CyclicScreenFunction esp32_2432S028RCyclicScreens[] = {esp32_2432S028R_MinerScreen, esp32_2432S028R_GlobalHashScreen, esp32_2432S028R_ClockScreen};
 
 DisplayDriver esp32_2432S028RDriver = {
     esp32_2432S028R_Init,

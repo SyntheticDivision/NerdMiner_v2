@@ -106,7 +106,7 @@ void setup()
   #endif
 
   /******** INIT NERDMINER ************/
-  Serial.println("NerdMiner v2 starting......");
+  Serial.println("SynMiner starting......");
 
   /******** INIT DISPLAY ************/
   initDisplay();
