@@ -8,6 +8,7 @@
 #include <WiFiManager.h>
 
 #include "wManager.h"
+#include "synGui.h"
 #include "monitor.h"
 #include "drivers/displays/display.h"
 #include "drivers/storage/SDCard.h"
@@ -334,6 +335,7 @@ void init_WifiManager()
         Serial.println("WiFi connected");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
+        synGuiStart();
 
 
         // Lets deal with the user config values
@@ -430,7 +432,10 @@ int oldStatus = 0;
 
 void wifiManagerProcess() {
 
-    wm.process(); // avoid delays() in loop when non-blocking and other long running code
+    wm.process();
+    if (WiFi.status() == WL_CONNECTED)
+      synGuiStart();
+    synGuiLoop();
 
     int newStatus = WiFi.status();
     if (newStatus != oldStatus) {

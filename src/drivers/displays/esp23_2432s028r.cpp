@@ -194,49 +194,28 @@ static void drawStat(int x, int w, const char *k, const String &v)
   tft.drawString(shown, x + w / 2, 204);
 }
 
-static int fitHeroSize(const char *text)
-{
-  int size = 44;
-  while (size > 20)
-  {
-    render.setFontSize(size);
-    if ((int)render.getTextWidth("%s", text) <= 300)
-      break;
-    size -= 2;
-  }
-  return size;
-}
-
 static void drawHero(const String &value)
 {
-  const int w = 320;
-  const int h = 88;
-  tft.fillRect(0, 36, 320, 96, TFT_BLACK);
-  if (!createBackgroundSprite(w, h))
-  {
-    tft.setTextFont(4);
-    tft.setTextDatum(TC_DATUM);
-    tft.setTextColor(SYN_CYAN, TFT_BLACK);
-    tft.drawString(value, 160, 64);
-    return;
-  }
-  background.fillSprite(TFT_BLACK);
-  render.setLineSpaceRatio(1.0);
-  int size = fitHeroSize(value.c_str());
-  render.setFontSize(size);
-  render.setAlignment(Align::MiddleCenter);
-  render.cdrawString(value.c_str(), w / 2, h / 2, SYN_CYAN);
-  background.pushSprite(0, 40);
-  background.deleteSprite();
+  int digits = 0;
+  for (unsigned i = 0; i < value.length(); i++)
+    if (value[i] >= '0' && value[i] <= '9')
+      digits++;
+  tft.fillRect(0, 32, 320, 104, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(SYN_CYAN, TFT_BLACK);
+  tft.setTextFont(digits > 5 ? 7 : 8);
+  tft.drawString(value, 160, 82);
 }
 
 static void drawUnit(const char *unit)
 {
-  tft.fillRect(0, 136, 320, 28, TFT_BLACK);
+  tft.fillRect(0, 138, 320, 28, TFT_BLACK);
   tft.setTextFont(4);
+  tft.setTextSize(1);
   tft.setTextDatum(TC_DATUM);
   tft.setTextColor(SYN_YEL, TFT_BLACK);
-  tft.drawString(unit, 160, 136);
+  tft.drawString(unit, 160, 138);
 }
 
 static void drawChrome(const String &temp)
@@ -297,24 +276,7 @@ void esp32_2432S028R_ClockScreen(unsigned long mElapsed)
   drawIp();
   hasChangedScreen = false;
 
-  String clock = data.currentTime;
-  int colon = clock.indexOf(':');
-  String hours = colon > 0 ? clock.substring(0, colon) : clock;
-  String mins = colon > 0 ? clock.substring(colon + 1) : String("00");
-  tft.fillRect(0, 36, 320, 96, TFT_BLACK);
-  if (createBackgroundSprite(320, 88))
-  {
-    background.fillSprite(TFT_BLACK);
-    render.setLineSpaceRatio(1.0);
-    render.setFontSize(44);
-    render.setAlignment(Align::MiddleCenter);
-    render.cdrawString(hours.c_str(), 108, 44, SYN_CYAN);
-    render.cdrawString(mins.c_str(), 212, 44, SYN_CYAN);
-    background.fillCircle(160, 32, 3, SYN_CYAN);
-    background.fillCircle(160, 52, 3, SYN_CYAN);
-    background.pushSprite(0, 40);
-    background.deleteSprite();
-  }
+  drawHero(data.currentTime);
   drawUnit(data.currentDate.c_str());
 
   char sec[8];
