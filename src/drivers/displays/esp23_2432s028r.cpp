@@ -172,52 +172,68 @@ static void drawTemp(const String &temp)
 
 static void drawStat(int x, int w, const char *k, const String &v)
 {
-  tft.fillRect(x, 188, w, 50, TFT_BLACK);
+  tft.fillRect(x, 176, w, 62, TFT_BLACK);
   tft.setTextFont(2);
   tft.setTextDatum(TC_DATUM);
   tft.setTextColor(SYN_MUTE, TFT_BLACK);
-  tft.drawString(k, x + w / 2, 192);
+  tft.drawString(k, x + w / 2, 182);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   String shown = v;
-  if (shown.length() > 10) shown = shown.substring(0, 10);
-  tft.drawString(shown, x + w / 2, 210);
+  if (shown.length() > 9) shown = shown.substring(0, 9);
+  tft.drawString(shown, x + w / 2, 204);
+}
+
+static int fitHeroSize(const char *text)
+{
+  int size = 44;
+  while (size > 20)
+  {
+    render.setFontSize(size);
+    if ((int)render.getTextWidth("%s", text) <= 300)
+      break;
+    size -= 2;
+  }
+  return size;
 }
 
 static void drawHero(const String &value)
 {
-  const int w = 300;
-  const int h = 86;
+  const int w = 320;
+  const int h = 88;
+  tft.fillRect(0, 36, 320, 96, TFT_BLACK);
   if (!createBackgroundSprite(w, h))
   {
     tft.setTextFont(4);
     tft.setTextDatum(TC_DATUM);
     tft.setTextColor(SYN_CYAN, TFT_BLACK);
-    tft.drawString(value, 160, 80);
+    tft.drawString(value, 160, 64);
     return;
   }
   background.fillSprite(TFT_BLACK);
-  render.setFontSize(56);
+  render.setLineSpaceRatio(1.0);
+  int size = fitHeroSize(value.c_str());
+  render.setFontSize(size);
   render.setAlignment(Align::MiddleCenter);
   render.cdrawString(value.c_str(), w / 2, h / 2, SYN_CYAN);
-  background.pushSprite(10, 48);
+  background.pushSprite(0, 40);
   background.deleteSprite();
 }
 
 static void drawUnit(const char *unit)
 {
-  tft.fillRect(0, 138, 320, 36, TFT_BLACK);
-  tft.setFreeFont(FSSB18);
+  tft.fillRect(0, 136, 320, 28, TFT_BLACK);
+  tft.setTextFont(4);
   tft.setTextDatum(TC_DATUM);
   tft.setTextColor(SYN_YEL, TFT_BLACK);
-  tft.drawString(unit, 160, 140);
+  tft.drawString(unit, 160, 136);
 }
 
 static void drawChrome(const String &temp)
 {
   tft.fillScreen(TFT_BLACK);
-  drawMark(8, 6);
+  drawMark(6, 4);
   drawTemp(temp);
-  tft.drawFastHLine(8, 182, 304, SYN_YEL);
+  tft.drawFastHLine(8, 170, 304, SYN_YEL);
 }
 
 static const char *poolState(void)
@@ -268,14 +284,21 @@ void esp32_2432S028R_ClockScreen(unsigned long mElapsed)
   hasChangedScreen = false;
 
   String clock = data.currentTime;
-  clock.replace(":", " ");
-  drawHero(clock);
-  if (createBackgroundSprite(16, 40))
+  int colon = clock.indexOf(':');
+  String hours = colon > 0 ? clock.substring(0, colon) : clock;
+  String mins = colon > 0 ? clock.substring(colon + 1) : String("00");
+  tft.fillRect(0, 36, 320, 96, TFT_BLACK);
+  if (createBackgroundSprite(320, 88))
   {
     background.fillSprite(TFT_BLACK);
-    background.fillCircle(8, 12, 3, SYN_CYAN);
-    background.fillCircle(8, 28, 3, SYN_CYAN);
-    background.pushSprite(152, 68);
+    render.setLineSpaceRatio(1.0);
+    render.setFontSize(44);
+    render.setAlignment(Align::MiddleCenter);
+    render.cdrawString(hours.c_str(), 108, 44, SYN_CYAN);
+    render.cdrawString(mins.c_str(), 212, 44, SYN_CYAN);
+    background.fillCircle(160, 32, 3, SYN_CYAN);
+    background.fillCircle(160, 52, 3, SYN_CYAN);
+    background.pushSprite(0, 40);
     background.deleteSprite();
   }
   drawUnit(data.currentDate.c_str());
